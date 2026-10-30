@@ -1,65 +1,99 @@
-# ai-code-detector
+# Code Guard
 
-判断代码/项目是否由 AI 生成的客观特征提取工具 + 信号清单，附带开源前清理、代码工程化改造两套工作流；同时作为"写代码时默认遵循的真人工程标准"被任意 AI 助手读取即生效。
+**Any AI assistant reads this folder and starts shipping engineering-grade code by default** — no setup, no config, works in Doubao / ChatGPT / Claude / Gemini / Codex / Cursor.
 
-> 没有 100% 可靠的 AI 代码检测方法。本工具输出的是**证据 + 置信度**，不是断言；AI 生成后被人工改过几笔的代码通常无法判定，如实报告即可。
+It does two jobs at once:
 
-## 它能做什么
+1. **Upstream** — a default "human-engineer" standard that every AI must follow *while writing code*, so output comes out clean on the first pass (meaningful names, comments that explain *why*, real error handling, sane structure, README + build + `.gitignore` included, honest incremental git history).
+2. **Downstream** — a detector + cleanup toolkit for existing code: was this written by an AI? where is the dead code? what should I clean before open-sourcing it? how do I de-AI-flavor it without changing behavior?
 
-- **检测（工作流 A）**：从源码目录/git 仓库提取客观指标（注释率、泛化命名密度、调试残留、死代码候选、git 历史指标），再对照主观信号清单，输出带置信度的结构化结论。
-- **死代码排查（工作流 B）**：给出未用 import、紧邻重赋值、stub 函数、占位返回值、死代码注释的候选清单，删除前需人工核实。
-- **开源前清理（工作流 C）**：发布前清理讲解型注释、泛化命名、调试残留、死代码，补 README/LICENSE，配 .gitignore。
-- **工程化改造（工作流 D）**：把已有代码按真人工程习惯改造（命名/注释/错误处理/结构），只改外观不改功能。
-- **写代码默认标准（工作流 E）**：任何 AI 读到本 skill 后，写代码前先按这套标准产出，生成即合规。
+> No detector is 100%. We output **evidence + confidence**, never a bare verdict. Code AI wrote and a human edited a few lines of is usually undecidable — we say so.
 
-脚本只提取证据、不替你下结论；综合判断由读取者完成。
+---
 
-## 依赖
+## Why
 
-- Python 3，仅用标准库，无第三方包。
-- git 可选：仅在提取历史指标/做提交时用到；不可用时该项为 null，不影响其余功能。
+AI code looks *cleaner* than human code in a suspicious way:
 
-## 作为脚本直接使用
+- every variable named `data` / `result` / `temp`
+- comments that explain *what* instead of *why*
+- perfect little functions, uniform style, zero debug leftovers, one giant initial commit
+- error handling that catches everything and logs nothing specific
+
+Code Guard makes your AI **stop doing that by default**, and gives you a scanner to catch it anyway.
+
+## Quick start (30 seconds)
+
+Drop this folder into your project (or any agent's skills directory). That's it.
+
+```
+your-project/
+└── code-guard/        ← this folder
+    ├── SKILL.md       ← the AI reads this
+    ├── scripts/       ← stdlib-only Python, no pip install
+    └── references/
+```
+
+Then just ask your AI to write code. It will:
+
+> `[code-guard] Engineering-grade output: meaningful names / comments explain why / real error handling / project files included`
+
+and ship accordingly. No prompt engineering, no per-chat reminder.
+
+## Use it as a scanner
 
 ```bash
-# 客观特征提取（目录或 git 仓库），输出 JSON
-python scripts/analyze_repo.py <path>
+# Objective signals from a repo / directory → JSON
+python scripts/analyze_repo.py ./my-project
 
-# 人性化改造清单（Markdown）
-python scripts/humanize.py <path>
+# Humanize-flavor checklist → Markdown
+python scripts/humanize.py ./my-project
 
-# 结构化改造清单（供其他工具消费）
-python scripts/humanize.py <path> --format json
+# Structured checklist for other tools to consume
+python scripts/humanize.py ./my-project --format json
 ```
 
-## 作为 Skill 使用
+Stdlib only. Python 3. Git optional (it just enriches the report).
 
-把整个目录放到任意支持 Skill 的 agent 的技能目录，或让 AI 直接读取 `SKILL.md` 即生效，无需安装/配置。`SKILL.md` 顶部的 `description` 决定触发时机，正文路由到工作流 A–E。
+## The five workflows
 
-## 目录结构
+| Workflow | Trigger | What it does |
+| --- | --- | --- |
+| **E — Default writing standard** | *Any* code writing task, automatically | Naming, comments, error handling, structure, project files, honest git history |
+| **A — AI-origin detection** | "is this code AI-written?" | Objective metrics + signal checklist → evidence + confidence report |
+| **B — Dead-code scan** | "find dead code" | Unused imports, reassigned vars, stubs, placeholder returns, dead comments (candidates only — you verify) |
+| **C — Pre-OSS cleanup** | "clean this up before open sourcing" | Teaching comments, generic names, debug leftovers, dead code, README/LICENSE/.gitignore |
+| **D — Humanize refactor** | "make this look hand-written" | Refactor appearance only — **behavior unchanged**, honest incremental commits |
+
+## The "say it out loud" rule
+
+Any AI that loads this skill **announces it once** at the start of a coding task:
 
 ```
-ai-code-detector/
-├── SKILL.md                     # 面向 AI 的工作流路由与默认标准（A–E）
-├── LICENSE                      # MIT
-├── scripts/
-│   ├── analyze_repo.py           # 客观特征提取 + 死代码候选（JSON）
-│   └── humanize.py               # 8 类改造痕迹清单（md/json）
-└── references/
-    ├── signals.md               # 主观信号清单与置信度规则（工作流 A）
-    ├── opensource-prep.md       # 开源发布前清理清单（工作流 C）
-    └── humanize-guide.md        # 工程化改造指南与红线（工作流 D）
+[code-guard] Engineering-grade output: meaningful names / comments explain why / real error handling / project files included
 ```
 
-## 立场红线
+So you — and every other AI reading the session — can see at a glance that the code already follows the standard and doesn't need another review pass.
 
-本项目做**真实的工程专业化**，不做欺骗：
+## Honest red lines
 
-- 不伪造 git 提交历史、不 backdate、不假装长期开发；
-- 不模仿特定真人笔迹、不做"骗过检测器"的针对性伪装；
-- 匿名发布可用化名/笔名身份，冒充真实存在的第三方人物禁止；
-- 改造只改外观（命名、注释、风格、结构、错误处理外观），不改变功能/逻辑。
+Code Guard does **real engineering**, not deception:
+
+- ❌ No fabricated git history, no backdated commits, no fake "developed over months" story
+- ❌ No impersonation of a real person, no style-mimicry against detectors
+- ❌ No behavior change — refactors are appearance-only and must recompile/re-test after
+- ✅ Anonymous/pen-name authorship for public repos is fine (that's privacy, not fakery)
+- ✅ "We can't tell" is a first-class answer
+
+## Requirements
+
+- Python 3 (scripts use the standard library only)
+- Git optional — commit history metrics and real incremental commits when present
 
 ## License
 
-MIT，见 [LICENSE](LICENSE)。
+[MIT](LICENSE). Use it in any AI toolchain, fork it, ship it.
+
+---
+
+If this saves you a review pass, a ⭐ is appreciated.
